@@ -21,8 +21,9 @@ namespace Microsoft.Extensions.Logging
         /// </summary>
         /// <param name="loggerFactory">The logger factory.</param>
         /// <param name="configuration">A configuration section with file parameters.</param>
+        /// <param name="preserveStaticLogger">Indicates whether to preserve the value of <see cref="Log.Logger"/>.</param>
         /// <returns>A logger factory to allow further configuration.</returns>
-        public static ILoggerFactory AddFile(this ILoggerFactory loggerFactory, IConfigurationSection configuration)
+        public static ILoggerFactory AddFile(this ILoggerFactory loggerFactory, IConfigurationSection configuration, bool preserveStaticLogger = false)
         {
             if (loggerFactory == null) throw new ArgumentNullException(nameof(loggerFactory));
             if (configuration == null) throw new ArgumentNullException(nameof(configuration));
@@ -37,7 +38,7 @@ namespace Microsoft.Extensions.Logging
             var minimumLevel = GetMinimumLogLevel(configuration);
             var levelOverrides = GetLevelOverrides(configuration);
 
-            return loggerFactory.AddFile(config.PathFormat, minimumLevel, levelOverrides, config.Json, config.FileSizeLimitBytes, config.RetainedFileCountLimit);
+            return loggerFactory.AddFile(config.PathFormat, minimumLevel, levelOverrides, config.Json, config.FileSizeLimitBytes, config.RetainedFileCountLimit, preserveStaticLogger);
         }
 
         /// <summary>
@@ -53,6 +54,7 @@ namespace Microsoft.Extensions.Logging
         /// For unrestricted growth, pass null. The default is 1 GB.</param>
         /// <param name="retainedFileCountLimit">The maximum number of log files that will be retained, including the current
         /// log file. For unlimited retention, pass null. The default is 31.</param>
+        /// <param name="preserveStaticLogger">Indicates whether to preserve the value of <see cref="Log.Logger"/>.</param>
         /// <returns>A logger factory to allow further configuration.</returns>
         public static ILoggerFactory AddFile(
             this ILoggerFactory loggerFactory,
@@ -61,10 +63,22 @@ namespace Microsoft.Extensions.Logging
             IDictionary<string, LogLevel> levelOverrides = null,
             bool isJson = false,
             long? fileSizeLimitBytes = FileLoggingConfiguration.DefaultFileSizeLimitBytes,
-            int? retainedFileCountLimit = FileLoggingConfiguration.DefaultRetainedFileCountLimit)
+            int? retainedFileCountLimit = FileLoggingConfiguration.DefaultRetainedFileCountLimit, 
+            bool preserveStaticLogger = false)
         {
             var logger = CreateLogger(pathFormat, minimumLevel, levelOverrides, isJson, fileSizeLimitBytes, retainedFileCountLimit);
-            return loggerFactory.AddSerilog(logger, dispose: true);
+
+            if (preserveStaticLogger)
+            {
+                return loggerFactory.AddSerilog(logger, dispose: true);
+            }
+            else
+            {
+                // Passing a `null` logger to `AddSerilog` results in disposal via
+                // `Log.CloseAndFlush()`, which additionally replaces the static logger with a no-op.
+                Log.Logger = logger;
+                return loggerFactory.AddSerilog(null, dispose: true);
+            }
         }
 
         /// <summary>
@@ -72,8 +86,9 @@ namespace Microsoft.Extensions.Logging
         /// </summary>
         /// <param name="loggingBuilder">The logging builder.</param>
         /// <param name="configuration">A configuration section with file parameters.</param>
+        /// <param name="preserveStaticLogger">Indicates whether to preserve the value of <see cref="Log.Logger"/>.</param>
         /// <returns>The logging builder to allow further configuration.</returns>
-        public static ILoggingBuilder AddFile(this ILoggingBuilder loggingBuilder, IConfiguration configuration)
+        public static ILoggingBuilder AddFile(this ILoggingBuilder loggingBuilder, IConfiguration configuration, bool preserveStaticLogger = false)
         {
             if (loggingBuilder == null) throw new ArgumentNullException(nameof(loggingBuilder));
             if (configuration == null) throw new ArgumentNullException(nameof(configuration));
@@ -88,7 +103,7 @@ namespace Microsoft.Extensions.Logging
             var minimumLevel = GetMinimumLogLevel(configuration);
             var levelOverrides = GetLevelOverrides(configuration);
 
-            return loggingBuilder.AddFile(config.PathFormat, minimumLevel, levelOverrides, config.Json, config.FileSizeLimitBytes, config.RetainedFileCountLimit);
+            return loggingBuilder.AddFile(config.PathFormat, minimumLevel, levelOverrides, config.Json, config.FileSizeLimitBytes, config.RetainedFileCountLimit, preserveStaticLogger);
         }
 
         /// <summary>
@@ -104,6 +119,7 @@ namespace Microsoft.Extensions.Logging
         /// For unrestricted growth, pass null. The default is 1 GB.</param>
         /// <param name="retainedFileCountLimit">The maximum number of log files that will be retained, including the current
         /// log file. For unlimited retention, pass null. The default is 31.</param>
+        /// <param name="preserveStaticLogger">Indicates whether to preserve the value of <see cref="Log.Logger"/>.</param>
         /// <returns>The logging builder to allow further configuration.</returns>
         public static ILoggingBuilder AddFile(this ILoggingBuilder loggingBuilder,
             string pathFormat,
@@ -111,11 +127,22 @@ namespace Microsoft.Extensions.Logging
             IDictionary<string, LogLevel> levelOverrides = null,
             bool isJson = false,
             long? fileSizeLimitBytes = FileLoggingConfiguration.DefaultFileSizeLimitBytes,
-            int? retainedFileCountLimit = FileLoggingConfiguration.DefaultRetainedFileCountLimit)
+            int? retainedFileCountLimit = FileLoggingConfiguration.DefaultRetainedFileCountLimit, 
+            bool preserveStaticLogger = false)
         {
             var logger = CreateLogger(pathFormat, minimumLevel, levelOverrides, isJson, fileSizeLimitBytes, retainedFileCountLimit);
 
-            return loggingBuilder.AddSerilog(logger, dispose: true);
+            if (preserveStaticLogger)
+            {
+                return loggingBuilder.AddSerilog(logger, dispose: true);
+            }
+            else
+            {
+                // Passing a `null` logger to `AddSerilog` results in disposal via
+                // `Log.CloseAndFlush()`, which additionally replaces the static logger with a no-op.
+                Log.Logger = logger;
+                return loggingBuilder.AddSerilog(null, dispose: true);
+            }
         }
 
         private static Serilog.Core.Logger CreateLogger(string pathFormat,
